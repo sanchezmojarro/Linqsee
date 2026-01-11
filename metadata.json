@@ -1,0 +1,5 @@
+{
+  "name": "LinkedIn AI Ghostwriter Dashboard",
+  "description": "A professional control panel to configure your AI LinkedIn persona, manage comment tones, and simulate AI-powered networking responses using Gemini 3.",
+  "requestFramePermissions": []
+}
