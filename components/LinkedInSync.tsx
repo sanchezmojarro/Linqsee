@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { parseLinkedInData } from '../services/geminiService';
 import { UserProfile } from '../types';
 
@@ -13,36 +13,58 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
   const [rawText, setRawText] = useState('');
   const [syncedDataPreview, setSyncedDataPreview] = useState<Partial<UserProfile> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const linkedInAuthUrl = import.meta.env.VITE_LINKEDIN_AUTH_URL as string | undefined;
+  const linkedInAuthOrigin = import.meta.env.VITE_LINKEDIN_AUTH_ORIGIN as string | undefined;
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (linkedInAuthOrigin && event.origin !== linkedInAuthOrigin) {
+        return;
+      }
+
+      const payload = event.data as {
+        type?: string;
+        profile?: Partial<UserProfile>;
+        error?: string;
+      };
+
+      if (payload?.type === 'linkedin:auth:error') {
+        alert(payload.error || 'Error al sincronizar con LinkedIn.');
+        setSyncStep('initial');
+        return;
+      }
+
+      if (payload?.type === 'linkedin:profile' && payload.profile) {
+        const dataWithTimestamp = {
+          ...payload.profile,
+          lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setSyncedDataPreview(dataWithTimestamp);
+        onSync(dataWithTimestamp);
+        setSyncStep('success');
+        setTimeout(() => {
+          setIsOpen(false);
+          setSyncStep('initial');
+          setSyncedDataPreview(null);
+        }, 3000);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [linkedInAuthOrigin, onSync]);
 
   const startOAuthFlow = () => {
     setSyncStep('oauth');
   };
 
   const handleAuthorize = () => {
+    if (!linkedInAuthUrl) {
+      alert('Configura la URL de autenticación de LinkedIn antes de continuar.');
+      return;
+    }
     setSyncStep('loading');
-    
-    // Simulate real API data extraction
-    setTimeout(() => {
-      const simulatedLinkedInData = {
-        name: "Carlos Mendoza",
-        expertise: "Head of Growth & AI Evangelist @ TechCorp",
-        bio: "Estratega digital enfocado en la adopción de IA Generativa para procesos de venta. Con más de 10 años escalando productos SaaS en Latinoamérica y Europa. Speaker habitual sobre el futuro del trabajo.",
-        tone: "Professional",
-        language: "Spanish",
-        lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      
-      setSyncedDataPreview(simulatedLinkedInData);
-      onSync(simulatedLinkedInData);
-      setSyncStep('success');
-      
-      // Auto-close after viewing the success card
-      setTimeout(() => {
-        setIsOpen(false);
-        setSyncStep('initial');
-        setSyncedDataPreview(null);
-      }, 3000);
-    }, 2500);
+    window.location.href = linkedInAuthUrl;
   };
 
   const handleManualSync = async () => {
@@ -204,6 +226,7 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
                     </div>
                     <h3 className="text-2xl font-black text-slate-900 leading-tight">GhostwriterAI solicita permisos</h3>
                     <p className="text-slate-500 mt-2 font-medium">Permite que GhostwriterAI acceda a tu información de LinkedIn para configurar tu Persona AI.</p>
+                    <p className="text-[11px] text-slate-400 mt-3 italic">Serás redirigido a LinkedIn para otorgar permisos y volverás con tus credenciales.</p>
                   </div>
                   
                   <div className="bg-slate-50 p-6 rounded-3xl space-y-4">
