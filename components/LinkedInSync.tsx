@@ -16,6 +16,26 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
   const linkedInAuthUrl = import.meta.env.VITE_LINKEDIN_AUTH_URL as string | undefined;
   const linkedInAuthOrigin = import.meta.env.VITE_LINKEDIN_AUTH_ORIGIN as string | undefined;
 
+  const applyLinkedInProfile = (profileData: Partial<UserProfile>) => {
+    const dataWithTimestamp = {
+      ...profileData,
+      lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setSyncedDataPreview(dataWithTimestamp);
+    onSync(dataWithTimestamp);
+    setSyncStep('success');
+    setTimeout(() => {
+      setIsOpen(false);
+      setSyncStep('initial');
+      setSyncedDataPreview(null);
+    }, 3000);
+  };
+
+  const applyLinkedInError = (message?: string) => {
+    alert(message || 'Error al sincronizar con LinkedIn.');
+    setSyncStep('initial');
+  };
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (linkedInAuthOrigin && event.origin !== linkedInAuthOrigin) {
@@ -29,30 +49,61 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
       };
 
       if (payload?.type === 'linkedin:auth:error') {
-        alert(payload.error || 'Error al sincronizar con LinkedIn.');
-        setSyncStep('initial');
+        applyLinkedInError(payload.error);
         return;
       }
 
       if (payload?.type === 'linkedin:profile' && payload.profile) {
-        const dataWithTimestamp = {
-          ...payload.profile,
-          lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        setSyncedDataPreview(dataWithTimestamp);
-        onSync(dataWithTimestamp);
-        setSyncStep('success');
-        setTimeout(() => {
-          setIsOpen(false);
-          setSyncStep('initial');
-          setSyncedDataPreview(null);
-        }, 3000);
+        applyLinkedInProfile(payload.profile);
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [linkedInAuthOrigin, onSync]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get('linkedin_status');
+    const error = params.get('linkedin_error');
+    const encodedProfile = params.get('linkedin_profile');
+
+    if (!status && !error && !encodedProfile) {
+      return;
+    }
+
+    if (error) {
+      applyLinkedInError(decodeURIComponent(error));
+    } else if (encodedProfile) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(encodedProfile)) as Partial<UserProfile>;
+        applyLinkedInProfile(decoded);
+      } catch (parseError) {
+        applyLinkedInError('No se pudo leer el perfil de LinkedIn devuelto.');
+      }
+    } else if (status === 'success') {
+      const profile = {
+        name: params.get('name') || '',
+        expertise: params.get('expertise') || '',
+        bio: params.get('bio') || '',
+        tone: params.get('tone') || 'Professional',
+        language: params.get('language') || 'Spanish'
+      };
+      applyLinkedInProfile(profile);
+    }
+
+    params.delete('linkedin_status');
+    params.delete('linkedin_error');
+    params.delete('linkedin_profile');
+    params.delete('name');
+    params.delete('expertise');
+    params.delete('bio');
+    params.delete('tone');
+    params.delete('language');
+
+    const newUrl = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', newUrl);
+  }, []);
 
   const startOAuthFlow = () => {
     setSyncStep('oauth');
