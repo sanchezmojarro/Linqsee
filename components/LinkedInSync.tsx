@@ -158,7 +158,7 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
                     <div className="space-y-2 pointer-events-none">
                       <i className="fas fa-cloud-upload-alt text-2xl text-slate-300"></i>
                       <p className="font-bold text-slate-700">Importar desde PDF de Perfil</p>
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">LinkedIn -> Guardar como PDF</p>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">LinkedIn → Guardar como PDF</p>
                     </div>
                   </div>
                 </div>
