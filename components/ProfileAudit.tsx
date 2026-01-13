@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { auditProfile, EnhancedAuditResult } from '../services/geminiService';
+import { AI_ENABLED, auditProfile, EnhancedAuditResult } from '../services/geminiService';
 
 interface ProfileAuditProps {
   profile: UserProfile | null;
@@ -14,6 +14,10 @@ export const ProfileAudit: React.FC<ProfileAuditProps> = ({ profile, onApplyImpr
 
   const runAudit = async () => {
     if (!profile) return;
+    if (!AI_ENABLED) {
+      alert("La IA está desactivada. Configura VITE_OPENAI_API_KEY o VITE_GEMINI_API_KEY.");
+      return;
+    }
     setLoading(true);
     try {
       const data = await auditProfile(profile);
@@ -58,7 +62,7 @@ export const ProfileAudit: React.FC<ProfileAuditProps> = ({ profile, onApplyImpr
           </div>
           <button 
             onClick={runAudit}
-            disabled={loading}
+            disabled={loading || !AI_ENABLED}
             className="w-full md:w-auto bg-slate-900 text-white px-10 py-4 rounded-2xl font-black text-sm hover:bg-blue-600 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 shadow-xl shadow-slate-200"
           >
             {loading ? (

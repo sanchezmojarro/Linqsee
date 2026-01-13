@@ -8,6 +8,7 @@ import { ProfileAudit } from './components/ProfileAudit';
 import { ExtensionBridge } from './components/ExtensionBridge';
 import { LinkedInSync } from './components/LinkedInSync';
 import { UserProfile, DashboardStats } from './types';
+import { AI_ENABLED } from './services/geminiService';
 
 type ViewState = 'landing' | 'auth' | 'dashboard';
 type Tab = 'config' | 'audit' | 'simulator' | 'extension';
@@ -144,6 +145,15 @@ const App: React.FC = () => {
 
       {/* Main Experience Area */}
       <main className="flex-1 p-6 lg:p-14 overflow-y-auto w-full">
+        {!AI_ENABLED && (
+          <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900 shadow-sm">
+            <p className="text-sm font-semibold">
+              ⚠️ IA desactivada: configura <span className="font-black">VITE_OPENAI_API_KEY</span> o{" "}
+              <span className="font-black">VITE_GEMINI_API_KEY</span>. La interfaz funciona, pero las funciones
+              de IA están deshabilitadas.
+            </p>
+          </div>
+        )}
         <header className="mb-14 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
           <div className="space-y-1">
             <h2 className="text-5xl font-black text-slate-900 tracking-tighter">

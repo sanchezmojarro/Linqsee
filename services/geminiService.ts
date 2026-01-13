@@ -6,10 +6,20 @@ const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE
 const openAiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
 const openAiModel = import.meta.env.VITE_OPENAI_MODEL || "gpt-4o-mini";
 
+export const AI_ENABLED = Boolean(openAiApiKey || geminiApiKey);
+
+const assertAIEnabled = () => {
+  if (!AI_ENABLED) {
+    console.warn("[AI] No API key configured. AI features are disabled.");
+    return false;
+  }
+  return true;
+};
+
 const resolveProvider = () => {
   if (openAiApiKey) return "openai";
   if (geminiApiKey) return "gemini";
-  throw new Error("Missing API key. Set VITE_OPENAI_API_KEY or VITE_GEMINI_API_KEY.");
+  return null;
 };
 
 const getGeminiClient = () => {
@@ -71,6 +81,9 @@ export const parseLinkedInData = async (rawText: string): Promise<Partial<UserPr
   `;
 
   try {
+    if (!assertAIEnabled()) {
+      return {};
+    }
     const provider = resolveProvider();
     if (provider === "openai") {
       const content = await runOpenAi({
@@ -81,6 +94,9 @@ export const parseLinkedInData = async (rawText: string): Promise<Partial<UserPr
       return JSON.parse(content || "{}");
     }
 
+    if (!provider) {
+      return {};
+    }
     const response = await getGeminiClient().models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
@@ -126,6 +142,9 @@ export const generateLinkedInComment = async (request: CommentGenerationRequest)
   else specific = "Alto valor. Estructura: Gancho disruptivo -> Aporte de valor técnico/estratégico -> Pregunta abierta de engagement.";
 
   try {
+    if (!assertAIEnabled()) {
+      return "AI disabled. Configure VITE_OPENAI_API_KEY or VITE_GEMINI_API_KEY.";
+    }
     const provider = resolveProvider();
     if (provider === "openai") {
       const content = await runOpenAi({
@@ -136,6 +155,9 @@ export const generateLinkedInComment = async (request: CommentGenerationRequest)
       return content || "Error.";
     }
 
+    if (!provider) {
+      return "AI disabled. Configure VITE_OPENAI_API_KEY or VITE_GEMINI_API_KEY.";
+    }
     const response = await getGeminiClient().models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `POST: """ ${postContent} """`,
@@ -178,6 +200,17 @@ export const auditProfile = async (profile: UserProfile): Promise<EnhancedAuditR
     About/Bio: ${profile.bio}
   `;
   try {
+    if (!assertAIEnabled()) {
+      return {
+        score: 0,
+        strengths: [],
+        weaknesses: [],
+        suggestions: [],
+        headline: { current: "", suggested: "", why: "", howToApply: "" },
+        about: { current: "", suggested: "", why: "", howToApply: "" },
+        experience: { current: "", suggested: "", why: "", howToApply: "" },
+      };
+    }
     const provider = resolveProvider();
     if (provider === "openai") {
       const content = await runOpenAi({
@@ -188,6 +221,17 @@ export const auditProfile = async (profile: UserProfile): Promise<EnhancedAuditR
       return JSON.parse(content || "{}");
     }
 
+    if (!provider) {
+      return {
+        score: 0,
+        strengths: [],
+        weaknesses: [],
+        suggestions: [],
+        headline: { current: "", suggested: "", why: "", howToApply: "" },
+        about: { current: "", suggested: "", why: "", howToApply: "" },
+        experience: { current: "", suggested: "", why: "", howToApply: "" },
+      };
+    }
     const response = await getGeminiClient().models.generateContent({
       model: "gemini-3-pro-preview",
       contents: prompt,

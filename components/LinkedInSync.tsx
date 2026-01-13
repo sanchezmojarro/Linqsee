@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { parseLinkedInData } from '../services/geminiService';
+import { AI_ENABLED, parseLinkedInData } from '../services/geminiService';
 import { UserProfile } from '../types';
 
 interface LinkedInSyncProps {
@@ -46,6 +46,10 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
   };
 
   const handleManualSync = async () => {
+    if (!AI_ENABLED) {
+      alert("La IA está desactivada. Configura VITE_OPENAI_API_KEY o VITE_GEMINI_API_KEY.");
+      return;
+    }
     if (!rawText.trim()) return;
     setSyncStep('loading');
     try {
@@ -172,7 +176,7 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
                     onChange={(e) => setRawText(e.target.value)}
                   />
                   <button 
-                    disabled={!rawText.trim()}
+                    disabled={!rawText.trim() || !AI_ENABLED}
                     onClick={handleManualSync}
                     className="w-full mt-4 bg-slate-900 text-white py-4 rounded-2xl font-black hover:bg-blue-600 disabled:opacity-30 transition-all"
                   >
