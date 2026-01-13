@@ -148,9 +148,8 @@ const App: React.FC = () => {
         {!AI_ENABLED && (
           <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900 shadow-sm">
             <p className="text-sm font-semibold">
-              ⚠️ IA desactivada: configura <span className="font-black">VITE_OPENAI_API_KEY</span> o{" "}
-              <span className="font-black">VITE_GEMINI_API_KEY</span>. La interfaz funciona, pero las funciones
-              de IA están deshabilitadas.
+              ⚠️ IA desactivada: configura <span className="font-black">VITE_OPENAI_API_KEY</span>. La interfaz
+              funciona, pero las funciones de IA están deshabilitadas.
             </p>
           </div>
         )}

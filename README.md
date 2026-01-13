@@ -15,6 +15,6 @@ View your app in AI Studio: https://ai.studio/apps/drive/1kVnB2BDfvCQMUmbEG8iGU7
 
 1. Install dependencies:
    `npm install`
-2. Set `VITE_GEMINI_API_KEY` (Gemini) or `VITE_OPENAI_API_KEY` (OpenAI) in [.env.local](.env.local) or in Vercel Environment Variables (do not commit API keys)
+2. Set `VITE_OPENAI_API_KEY` in [.env.local](.env.local) or in Vercel Environment Variables (do not commit API keys)
 3. Run the app:
    `npm run dev`

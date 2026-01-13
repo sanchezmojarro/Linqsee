@@ -1,12 +1,10 @@
 
-import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { CommentGenerationRequest, CommentType, UserProfile, AuditResult } from "../types";
 
-const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY;
 const openAiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
 const openAiModel = import.meta.env.VITE_OPENAI_MODEL || "gpt-4o-mini";
 
-export const AI_ENABLED = Boolean(openAiApiKey || geminiApiKey);
+export const AI_ENABLED = Boolean(openAiApiKey);
 
 const assertAIEnabled = () => {
   if (!AI_ENABLED) {
@@ -14,19 +12,6 @@ const assertAIEnabled = () => {
     return false;
   }
   return true;
-};
-
-const resolveProvider = () => {
-  if (openAiApiKey) return "openai";
-  if (geminiApiKey) return "gemini";
-  return null;
-};
-
-const getGeminiClient = () => {
-  if (!geminiApiKey) {
-    throw new Error("Missing Gemini API key. Set VITE_GEMINI_API_KEY.");
-  }
-  return new GoogleGenAI({ apiKey: geminiApiKey });
 };
 
 const runOpenAi = async ({
@@ -84,42 +69,12 @@ export const parseLinkedInData = async (rawText: string): Promise<Partial<UserPr
     if (!assertAIEnabled()) {
       return {};
     }
-    const provider = resolveProvider();
-    if (provider === "openai") {
-      const content = await runOpenAi({
-        system: "You are an assistant that returns only valid JSON objects.",
-        user: prompt,
-        responseFormat: { type: "json_object" },
-      });
-      return JSON.parse(content || "{}");
-    }
-
-    if (!provider) {
-      return {};
-    }
-    const response = await getGeminiClient().models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            name: { type: Type.STRING },
-            expertise: { type: Type.STRING },
-            bio: { type: Type.STRING },
-            tone: {
-              type: Type.STRING,
-              description: "Suggest a tone from: Professional, Enthusiastic, Ironic, Direct, Empathetic",
-            },
-            language: { type: Type.STRING },
-          },
-          required: ["name", "expertise", "bio", "tone", "language"],
-        },
-      },
+    const content = await runOpenAi({
+      system: "You are an assistant that returns only valid JSON objects.",
+      user: prompt,
+      responseFormat: { type: "json_object" },
     });
-
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(content || "{}");
   } catch (error) {
     console.error("Error parsing LinkedIn data:", error);
     throw error;
@@ -143,27 +98,14 @@ export const generateLinkedInComment = async (request: CommentGenerationRequest)
 
   try {
     if (!assertAIEnabled()) {
-      return "AI disabled. Configure VITE_OPENAI_API_KEY or VITE_GEMINI_API_KEY.";
+      return "AI disabled. Configure VITE_OPENAI_API_KEY.";
     }
-    const provider = resolveProvider();
-    if (provider === "openai") {
-      const content = await runOpenAi({
-        system: `${systemInstruction}\n${specific}`,
-        user: `POST: """ ${postContent} """`,
-        temperature: 0.8,
-      });
-      return content || "Error.";
-    }
-
-    if (!provider) {
-      return "AI disabled. Configure VITE_OPENAI_API_KEY or VITE_GEMINI_API_KEY.";
-    }
-    const response = await getGeminiClient().models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `POST: """ ${postContent} """`,
-      config: { systemInstruction: `${systemInstruction}\n${specific}`, temperature: 0.8 },
+    const content = await runOpenAi({
+      system: `${systemInstruction}\n${specific}`,
+      user: `POST: """ ${postContent} """`,
+      temperature: 0.8,
     });
-    return response.text || "Error.";
+    return content || "Error.";
   } catch (e) {
     return "Error de API.";
   }
@@ -211,79 +153,11 @@ export const auditProfile = async (profile: UserProfile): Promise<EnhancedAuditR
         experience: { current: "", suggested: "", why: "", howToApply: "" },
       };
     }
-    const provider = resolveProvider();
-    if (provider === "openai") {
-      const content = await runOpenAi({
-        system: "You are an assistant that returns only valid JSON objects.",
-        user: prompt,
-        responseFormat: { type: "json_object" },
-      });
-      return JSON.parse(content || "{}");
-    }
-
-    if (!provider) {
-      return {
-        score: 0,
-        strengths: [],
-        weaknesses: [],
-        suggestions: [],
-        headline: { current: "", suggested: "", why: "", howToApply: "" },
-        about: { current: "", suggested: "", why: "", howToApply: "" },
-        experience: { current: "", suggested: "", why: "", howToApply: "" },
-      };
-    }
-    const response = await getGeminiClient().models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            score: { type: Type.INTEGER },
-            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-            weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-            headline: {
-              type: Type.OBJECT,
-              properties: {
-                current: { type: Type.STRING },
-                suggested: { type: Type.STRING },
-                why: { type: Type.STRING },
-                howToApply: { type: Type.STRING },
-              },
-            },
-            about: {
-              type: Type.OBJECT,
-              properties: {
-                current: { type: Type.STRING },
-                suggested: { type: Type.STRING },
-                why: { type: Type.STRING },
-                howToApply: { type: Type.STRING },
-              },
-            },
-            experience: {
-              type: Type.OBJECT,
-              properties: {
-                current: { type: Type.STRING },
-                suggested: { type: Type.STRING },
-                why: { type: Type.STRING },
-                howToApply: { type: Type.STRING },
-              },
-            },
-            suggestions: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                },
-              },
-            },
-          },
-        },
-      },
+    const content = await runOpenAi({
+      system: "You are an assistant that returns only valid JSON objects.",
+      user: prompt,
+      responseFormat: { type: "json_object" },
     });
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(content || "{}");
   } catch (e) { throw e; }
 };

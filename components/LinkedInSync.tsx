@@ -47,7 +47,7 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
 
   const handleManualSync = async () => {
     if (!AI_ENABLED) {
-      alert("La IA está desactivada. Configura VITE_OPENAI_API_KEY o VITE_GEMINI_API_KEY.");
+      alert("La IA está desactivada. Configura VITE_OPENAI_API_KEY.");
       return;
     }
     if (!rawText.trim()) return;

@@ -15,7 +15,7 @@ export const ProfileAudit: React.FC<ProfileAuditProps> = ({ profile, onApplyImpr
   const runAudit = async () => {
     if (!profile) return;
     if (!AI_ENABLED) {
-      alert("La IA está desactivada. Configura VITE_OPENAI_API_KEY o VITE_GEMINI_API_KEY.");
+      alert("La IA está desactivada. Configura VITE_OPENAI_API_KEY.");
       return;
     }
     setLoading(true);

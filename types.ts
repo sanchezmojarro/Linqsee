@@ -15,7 +15,7 @@ export interface UserProfile {
   lastSync?: string;
 }
 
-// Added missing CommentGenerationRequest interface to fix the import error in geminiService.ts
+// Added missing CommentGenerationRequest interface to fix the import error in the AI service.
 export interface CommentGenerationRequest {
   profile: UserProfile;
   postContent: string;
