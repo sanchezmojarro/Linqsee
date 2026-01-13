@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { AI_ENABLED, parseLinkedInData } from '../services/geminiService';
 import { UserProfile } from '../types';
 
@@ -15,35 +15,55 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startOAuthFlow = () => {
-    setSyncStep('oauth');
+    window.location.href = '/api/linkedin/auth';
   };
 
-  const handleAuthorize = () => {
-    setSyncStep('loading');
-    
-    // Simulate real API data extraction
-    setTimeout(() => {
-      const simulatedLinkedInData = {
-        name: "Carlos Mendoza",
-        expertise: "Head of Growth & AI Evangelist @ TechCorp",
-        bio: "Estratega digital enfocado en la adopción de IA Generativa para procesos de venta. Con más de 10 años escalando productos SaaS en Latinoamérica y Europa. Speaker habitual sobre el futuro del trabajo.",
-        tone: "Professional",
-        language: "Spanish",
-        lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      
-      setSyncedDataPreview(simulatedLinkedInData);
-      onSync(simulatedLinkedInData);
-      setSyncStep('success');
-      
-      // Auto-close after viewing the success card
-      setTimeout(() => {
-        setIsOpen(false);
-        setSyncStep('initial');
-        setSyncedDataPreview(null);
-      }, 3000);
-    }, 2500);
-  };
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const linkedInStatus = params.get('linkedin');
+    if (!linkedInStatus) return;
+
+    if (linkedInStatus === 'success') {
+      setSyncStep('loading');
+      setIsOpen(true);
+      fetch('/api/linkedin/me', { credentials: 'include' })
+        .then((res) => {
+          if (!res.ok) throw new Error('LinkedIn profile fetch failed');
+          return res.json();
+        })
+        .then((data) => {
+          const synced = {
+            name: data.name || '',
+            expertise: data.headline || '',
+            bio: data.bio || '',
+            tone: 'Professional',
+            language: 'Spanish',
+            linkedInUrl: data.profileUrl,
+            lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setSyncedDataPreview(synced);
+          onSync(synced);
+          setSyncStep('success');
+          setTimeout(() => {
+            setIsOpen(false);
+            setSyncStep('initial');
+            setSyncedDataPreview(null);
+          }, 3000);
+        })
+        .catch(() => {
+          alert('No se pudo obtener el perfil de LinkedIn. Inténtalo de nuevo.');
+          setSyncStep('initial');
+        })
+        .finally(() => {
+          params.delete('linkedin');
+          window.history.replaceState({}, '', window.location.pathname);
+        });
+    } else if (linkedInStatus === 'error') {
+      alert('La conexión con LinkedIn falló. Revisa permisos y vuelve a intentarlo.');
+      params.delete('linkedin');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [onSync]);
 
   const handleManualSync = async () => {
     if (!AI_ENABLED) {
@@ -229,7 +249,7 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
 
                   <div className="flex gap-4">
                     <button onClick={() => setSyncStep('initial')} className="flex-1 py-4 font-bold text-slate-400 hover:text-slate-600 transition-colors">Cancelar</button>
-                    <button onClick={handleAuthorize} className="flex-1 bg-[#0a66c2] text-white py-4 rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-[#004182] transition-all">Permitir Acceso</button>
+                    <button onClick={startOAuthFlow} className="flex-1 bg-[#0a66c2] text-white py-4 rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-[#004182] transition-all">Permitir Acceso</button>
                   </div>
                 </div>
               </div>
