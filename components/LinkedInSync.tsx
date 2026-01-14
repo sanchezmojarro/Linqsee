@@ -28,7 +28,13 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let pdf;
+    try {
+      pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    } catch (error) {
+      console.warn("PDF.js worker failed, retrying without worker.", error);
+      pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true }).promise;
+    }
     let text = "";
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
