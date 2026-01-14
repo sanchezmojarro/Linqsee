@@ -53,7 +53,7 @@ const App: React.FC = () => {
     setStats(prev => ({ 
       ...prev, 
       profileStrength: Math.min(strength, 100),
-      syncStatus: p.name ? 'connected' : 'disconnected'
+      syncStatus: p.lastSync ? 'connected' : 'disconnected'
     }));
   };
 
@@ -80,7 +80,19 @@ const App: React.FC = () => {
       expertise: partial.expertise || profile?.expertise || '',
       bio: partial.bio || profile?.bio || '',
       tone: partial.tone || profile?.tone || 'Professional',
-      language: partial.language || profile?.language || 'Spanish'
+      language: partial.language || profile?.language || 'Spanish',
+      linkedInUrl: partial.linkedInUrl || profile?.linkedInUrl,
+      lastSync: partial.lastSync || profile?.lastSync
+    };
+    handleProfileSave(updated);
+  };
+
+  const handleDisconnect = () => {
+    if (!profile) return;
+    const updated: UserProfile = {
+      ...profile,
+      linkedInUrl: undefined,
+      lastSync: undefined
     };
     handleProfileSave(updated);
   };
@@ -182,7 +194,7 @@ const App: React.FC = () => {
         <div className="animate-in fade-in slide-in-from-bottom-6 duration-1000 max-w-7xl">
           {activeTab === 'config' && (
             <div className="space-y-12">
-               <LinkedInSync onSync={handleSyncData} />
+               <LinkedInSync isSynced={!!profile?.lastSync} onSync={handleSyncData} onDisconnect={handleDisconnect} />
                <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
                   <div className="xl:col-span-2">
                      <ProfileForm onSave={handleProfileSave} />

@@ -4,10 +4,12 @@ import { AI_ENABLED, parseLinkedInData } from '../services/geminiService';
 import { UserProfile } from '../types';
 
 interface LinkedInSyncProps {
+  isSynced: boolean;
   onSync: (data: Partial<UserProfile>) => void;
+  onDisconnect: () => void;
 }
 
-export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
+export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, onDisconnect }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [syncStep, setSyncStep] = useState<'initial' | 'oauth' | 'loading' | 'success'>('initial');
   const [rawText, setRawText] = useState('');
@@ -31,8 +33,8 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
           if (!res.ok) throw new Error('LinkedIn profile fetch failed');
           return res.json();
         })
-        .then((data) => {
-          const synced = {
+        .then(async (data) => {
+          const baseSynced = {
             name: data.name || '',
             expertise: data.headline || '',
             bio: data.bio || '',
@@ -41,8 +43,23 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
             linkedInUrl: data.profileUrl,
             lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           };
-          setSyncedDataPreview(synced);
-          onSync(synced);
+
+          if (AI_ENABLED && (!baseSynced.expertise || !baseSynced.bio)) {
+            const rawText = JSON.stringify(data.raw ?? data, null, 2);
+            try {
+              const aiData = await parseLinkedInData(rawText);
+              baseSynced.name = baseSynced.name || aiData.name || '';
+              baseSynced.expertise = baseSynced.expertise || aiData.expertise || '';
+              baseSynced.bio = baseSynced.bio || aiData.bio || '';
+              baseSynced.tone = aiData.tone || baseSynced.tone;
+              baseSynced.language = aiData.language || baseSynced.language;
+            } catch (error) {
+              console.warn('No se pudo enriquecer el perfil con IA.', error);
+            }
+          }
+
+          setSyncedDataPreview(baseSynced);
+          onSync(baseSynced);
           setSyncStep('success');
           setTimeout(() => {
             setIsOpen(false);
@@ -137,13 +154,27 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
                 <i className="fas fa-file-pdf"></i> Subir PDF
               </button>
               <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleFileUpload} />
-              <button 
-                onClick={() => setIsOpen(true)}
-                className="bg-[#0a66c2] text-white px-8 py-3.5 rounded-2xl font-black text-sm hover:bg-[#004182] transition-all shadow-xl shadow-blue-100 flex items-center gap-2"
-              >
-                Vincular LinkedIn
-                <i className="fas fa-lock text-[10px]"></i>
-              </button>
+              {isSynced ? (
+                <button
+                  onClick={() => {
+                    fetch('/api/linkedin/logout', { method: 'POST' }).finally(() => {
+                      onDisconnect();
+                    });
+                  }}
+                  className="bg-white text-slate-700 px-8 py-3.5 rounded-2xl font-black text-sm hover:bg-slate-100 transition-all shadow-sm border border-slate-200 flex items-center gap-2"
+                >
+                  Desvincular
+                  <i className="fas fa-unlink text-[10px]"></i>
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setIsOpen(true)}
+                  className="bg-[#0a66c2] text-white px-8 py-3.5 rounded-2xl font-black text-sm hover:bg-[#004182] transition-all shadow-xl shadow-blue-100 flex items-center gap-2"
+                >
+                  Vincular LinkedIn
+                  <i className="fas fa-lock text-[10px]"></i>
+                </button>
+              )}
             </div>
           </div>
         </div>
