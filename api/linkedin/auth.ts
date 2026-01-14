@@ -1,6 +1,7 @@
 const buildAuthUrl = (state: string) => {
   const clientId = process.env.LINKEDIN_CLIENT_ID;
   const redirectUri = process.env.LINKEDIN_REDIRECT_URI;
+  const scope = process.env.LINKEDIN_SCOPES || "openid profile email";
 
   if (!clientId) {
     throw new Error("LINKEDIN_CLIENT_ID not set");
@@ -13,7 +14,7 @@ const buildAuthUrl = (state: string) => {
     response_type: "code",
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: "openid profile email",
+    scope,
     state,
   });
 
