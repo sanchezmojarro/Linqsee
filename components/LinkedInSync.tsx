@@ -16,8 +16,21 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
   const [syncedDataPreview, setSyncedDataPreview] = useState<Partial<UserProfile> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const loadPdfJs = async () => {
+    if ((window as any).pdfjsLib) return (window as any).pdfjsLib;
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.min.js';
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('No se pudo cargar PDF.js.'));
+      document.head.appendChild(script);
+    });
+    return (window as any).pdfjsLib;
+  };
+
   const extractPdfText = async (file: File) => {
-    const pdfjsLib = (window as any).pdfjsLib;
+    const pdfjsLib = await loadPdfJs();
     if (!pdfjsLib) {
       throw new Error("PDF.js no está disponible.");
     }
@@ -167,7 +180,8 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
             setSyncedDataPreview(null);
           }, 3000);
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error('PDF parse failed', error);
           alert('No se pudo procesar el PDF. Inténtalo de nuevo.');
           setSyncStep('initial');
         });
