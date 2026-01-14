@@ -16,6 +16,33 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
   const [syncedDataPreview, setSyncedDataPreview] = useState<Partial<UserProfile> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const extractPdfText = async (file: File) => {
+    const pdfjsLib = (window as any).pdfjsLib;
+    if (!pdfjsLib) {
+      throw new Error("PDF.js no está disponible.");
+    }
+
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.js";
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let text = "";
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
+      const page = await pdf.getPage(pageNum);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item: any) => ("str" in item ? item.str : ""))
+        .join(" ");
+      text += `${pageText}\n`;
+    }
+
+    return text.trim();
+  };
+
   const startOAuthFlow = () => {
     window.location.href = '/api/linkedin/auth';
   };
@@ -109,26 +136,35 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!AI_ENABLED) {
+        alert("La IA está desactivada. Configura VITE_OPENAI_API_KEY.");
+        return;
+      }
       setSyncStep('loading');
       setIsOpen(true);
-      setTimeout(() => {
-        const data = {
-          name: "Perfil Extraído de PDF",
-          expertise: "Consultor Senior de Estrategia Corporativa",
-          bio: "Experto en optimización de procesos y transformación digital con enfoque en rentabilidad. He trabajado con empresas del IBEX35 definiendo su roadmap tecnológico.",
-          tone: "Direct",
-          language: "Spanish",
-          lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        setSyncedDataPreview(data);
-        onSync(data);
-        setSyncStep('success');
-        setTimeout(() => {
-          setIsOpen(false);
+      extractPdfText(file)
+        .then(async (extractedText) => {
+          if (!extractedText.trim()) {
+            throw new Error('No text extracted from PDF');
+          }
+          const data = await parseLinkedInData(extractedText);
+          const dataWithTimestamp = {
+            ...data,
+            lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+          setSyncedDataPreview(dataWithTimestamp);
+          onSync(dataWithTimestamp);
+          setSyncStep('success');
+          setTimeout(() => {
+            setIsOpen(false);
+            setSyncStep('initial');
+            setSyncedDataPreview(null);
+          }, 3000);
+        })
+        .catch(() => {
+          alert('No se pudo procesar el PDF. Inténtalo de nuevo.');
           setSyncStep('initial');
-          setSyncedDataPreview(null);
-        }, 3000);
-      }, 2000);
+        });
     }
   };
 

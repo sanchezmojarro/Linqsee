@@ -51,8 +51,16 @@ export const ProfileAudit: React.FC<ProfileAuditProps> = ({ profile, onApplyImpr
     </div>
   );
 
+  const missingProfileData = !profile.expertise || !profile.bio;
+
   return (
     <div className="space-y-8">
+      {missingProfileData && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-4 text-amber-900 text-sm font-semibold">
+          ⚠️ Faltan datos de tu perfil (headline o biografía). LinkedIn no los expone vía OIDC.
+          Para una auditoría completa, sube el PDF de tu perfil desde LinkedIn.
+        </div>
+      )}
       {/* Audit Control Card */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-50 overflow-hidden relative">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">

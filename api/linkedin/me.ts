@@ -19,18 +19,9 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const [userInfoResponse, liteProfileResponse, emailResponse] = await Promise.all([
-      fetch("https://api.linkedin.com/v2/userinfo", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }),
-      fetch("https://api.linkedin.com/v2/me", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }),
-      fetch(
-        "https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))",
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      ),
-    ]);
+    const userInfoResponse = await fetch("https://api.linkedin.com/v2/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
 
     if (!userInfoResponse.ok) {
       const errorText = await userInfoResponse.text();
@@ -41,24 +32,15 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const [userInfo, liteProfile, emailData] = await Promise.all([
-      userInfoResponse.json(),
-      liteProfileResponse.ok ? liteProfileResponse.json() : Promise.resolve({}),
-      emailResponse.ok ? emailResponse.json() : Promise.resolve({}),
-    ]);
-
-    const fullName = [liteProfile.localizedFirstName, liteProfile.localizedLastName]
-      .filter(Boolean)
-      .join(" ");
-    const emailFromApi = emailData?.elements?.[0]?.["handle~"]?.emailAddress;
+    const userInfo = await userInfoResponse.json();
 
     const normalized = {
-      name: fullName || userInfo.name || userInfo.localizedFirstName || userInfo.given_name || "",
-      headline: liteProfile.localizedHeadline || userInfo.headline || "",
+      name: userInfo.name || userInfo.localizedFirstName || userInfo.given_name || "",
+      headline: userInfo.headline || "",
       bio: userInfo.bio || "",
       profileUrl: userInfo.profile || userInfo.profileUrl || "",
-      email: emailFromApi || userInfo.email || userInfo.email_address || "",
-      raw: { userInfo, liteProfile, emailData },
+      email: userInfo.email || userInfo.email_address || "",
+      raw: { userInfo },
     };
 
     res.statusCode = 200;

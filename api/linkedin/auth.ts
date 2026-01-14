@@ -13,7 +13,7 @@ const buildAuthUrl = (state: string) => {
     response_type: "code",
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: "openid profile email r_liteprofile r_emailaddress",
+    scope: "openid profile email",
     state,
   });
 

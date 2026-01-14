@@ -140,6 +140,8 @@ export const auditProfile = async (profile: UserProfile): Promise<EnhancedAuditR
     Nombre: ${profile.name}
     Headline/Expertise: ${profile.expertise}
     About/Bio: ${profile.bio}
+
+    Si algún campo está vacío porque LinkedIn no lo proporciona por API, indícalo como "No disponible por API" y evita marcarlo como una debilidad concluyente.
   `;
   try {
     if (!assertAIEnabled()) {
