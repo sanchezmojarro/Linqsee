@@ -19,12 +19,21 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const profileResponse = await fetch("https://api.linkedin.com/v2/userinfo", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    const [userInfoResponse, liteProfileResponse, emailResponse] = await Promise.all([
+      fetch("https://api.linkedin.com/v2/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }),
+      fetch("https://api.linkedin.com/v2/me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }),
+      fetch(
+        "https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))",
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      ),
+    ]);
 
-    if (!profileResponse.ok) {
-      const errorText = await profileResponse.text();
+    if (!userInfoResponse.ok) {
+      const errorText = await userInfoResponse.text();
       console.error("[LinkedIn] userinfo fetch failed:", errorText);
       res.statusCode = 502;
       res.setHeader("Content-Type", "application/json");
@@ -32,14 +41,24 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const profile = await profileResponse.json();
+    const [userInfo, liteProfile, emailData] = await Promise.all([
+      userInfoResponse.json(),
+      liteProfileResponse.ok ? liteProfileResponse.json() : Promise.resolve({}),
+      emailResponse.ok ? emailResponse.json() : Promise.resolve({}),
+    ]);
+
+    const fullName = [liteProfile.localizedFirstName, liteProfile.localizedLastName]
+      .filter(Boolean)
+      .join(" ");
+    const emailFromApi = emailData?.elements?.[0]?.["handle~"]?.emailAddress;
+
     const normalized = {
-      name: profile.name || profile.localizedFirstName || profile.given_name || "",
-      headline: profile.headline || profile.localizedHeadline || "",
-      bio: profile.bio || "",
-      profileUrl: profile.profile || profile.profileUrl || "",
-      email: profile.email || profile.email_address || "",
-      raw: profile,
+      name: fullName || userInfo.name || userInfo.localizedFirstName || userInfo.given_name || "",
+      headline: liteProfile.localizedHeadline || userInfo.headline || "",
+      bio: userInfo.bio || "",
+      profileUrl: userInfo.profile || userInfo.profileUrl || "",
+      email: emailFromApi || userInfo.email || userInfo.email_address || "",
+      raw: { userInfo, liteProfile, emailData },
     };
 
     res.statusCode = 200;
