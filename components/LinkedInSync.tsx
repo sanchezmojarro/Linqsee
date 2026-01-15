@@ -16,50 +16,6 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
   const [syncedDataPreview, setSyncedDataPreview] = useState<Partial<UserProfile> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const loadPdfJs = async () => {
-    if ((window as any).pdfjsLib) return (window as any).pdfjsLib;
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.min.js';
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('No se pudo cargar PDF.js.'));
-      document.head.appendChild(script);
-    });
-    return (window as any).pdfjsLib;
-  };
-
-  const extractPdfText = async (file: File) => {
-    const pdfjsLib = await loadPdfJs();
-    if (!pdfjsLib) {
-      throw new Error("PDF.js no está disponible.");
-    }
-
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.js";
-
-    const arrayBuffer = await file.arrayBuffer();
-    let pdf;
-    try {
-      pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    } catch (error) {
-      console.warn("PDF.js worker failed, retrying without worker.", error);
-      pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true }).promise;
-    }
-
-    let text = "";
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
-      const page = await pdf.getPage(pageNum);
-      const content = await page.getTextContent();
-      const pageText = content.items
-        .map((item: any) => ("str" in item ? item.str : ""))
-        .join(" ");
-      text += `${pageText}\n`;
-    }
-
-    return text.trim();
-  };
-
   const startOAuthFlow = () => {
     window.location.href = '/api/linkedin/auth';
   };
@@ -159,12 +115,21 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
       }
       setSyncStep('loading');
       setIsOpen(true);
-      extractPdfText(file)
-        .then(async (extractedText) => {
-          if (!extractedText.trim()) {
+      const formData = new FormData();
+      formData.append('file', file);
+      fetch('/api/pdf/parse', { method: 'POST', body: formData })
+        .then(async (res) => {
+          const payload = await res.json().catch(() => null);
+          if (!res.ok) {
+            throw new Error(payload?.error || `HTTP ${res.status}`);
+          }
+          if (!payload?.text) {
             throw new Error('No text extracted from PDF');
           }
-          const data = await parseLinkedInData(extractedText);
+          return payload;
+        })
+        .then(async (payload) => {
+          const data = await parseLinkedInData(payload.text);
           const dataWithTimestamp = {
             ...data,
             lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -180,7 +145,7 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
         })
         .catch((error) => {
           console.error('PDF parse failed', error);
-          alert('No se pudo procesar el PDF. Inténtalo de nuevo.');
+          alert(`No se pudo procesar el PDF. ${error.message || 'Inténtalo de nuevo.'}`);
           setSyncStep('initial');
         });
     }
