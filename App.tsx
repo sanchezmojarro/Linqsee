@@ -8,6 +8,7 @@ import { ProfileAudit } from './components/ProfileAudit';
 import { ExtensionBridge } from './components/ExtensionBridge';
 import { LinkedInSync } from './components/LinkedInSync';
 import { UserProfile, DashboardStats } from './types';
+import { AI_ENABLED } from './services/geminiService';
 
 type ViewState = 'landing' | 'auth' | 'dashboard';
 type Tab = 'config' | 'audit' | 'simulator' | 'extension';
@@ -52,7 +53,7 @@ const App: React.FC = () => {
     setStats(prev => ({ 
       ...prev, 
       profileStrength: Math.min(strength, 100),
-      syncStatus: p.name ? 'connected' : 'disconnected'
+      syncStatus: p.lastSync ? 'connected' : 'disconnected'
     }));
   };
 
@@ -79,7 +80,24 @@ const App: React.FC = () => {
       expertise: partial.expertise || profile?.expertise || '',
       bio: partial.bio || profile?.bio || '',
       tone: partial.tone || profile?.tone || 'Professional',
-      language: partial.language || profile?.language || 'Spanish'
+      language: partial.language || profile?.language || 'Spanish',
+      linkedInUrl: partial.linkedInUrl || profile?.linkedInUrl,
+      lastSync: partial.lastSync || profile?.lastSync,
+      email: partial.email || profile?.email,
+      phone: partial.phone || profile?.phone,
+      skills: partial.skills || profile?.skills,
+      experience: partial.experience || profile?.experience,
+      education: partial.education || profile?.education
+    };
+    handleProfileSave(updated);
+  };
+
+  const handleDisconnect = () => {
+    if (!profile) return;
+    const updated: UserProfile = {
+      ...profile,
+      linkedInUrl: undefined,
+      lastSync: undefined
     };
     handleProfileSave(updated);
   };
@@ -144,6 +162,14 @@ const App: React.FC = () => {
 
       {/* Main Experience Area */}
       <main className="flex-1 p-6 lg:p-14 overflow-y-auto w-full">
+        {!AI_ENABLED && (
+          <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-900 shadow-sm">
+            <p className="text-sm font-semibold">
+              ⚠️ IA desactivada: configura <span className="font-black">VITE_OPENAI_API_KEY</span>. La interfaz
+              funciona, pero las funciones de IA están deshabilitadas.
+            </p>
+          </div>
+        )}
         <header className="mb-14 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
           <div className="space-y-1">
             <h2 className="text-5xl font-black text-slate-900 tracking-tighter">
@@ -173,7 +199,7 @@ const App: React.FC = () => {
         <div className="animate-in fade-in slide-in-from-bottom-6 duration-1000 max-w-7xl">
           {activeTab === 'config' && (
             <div className="space-y-12">
-               <LinkedInSync onSync={handleSyncData} />
+               <LinkedInSync isSynced={!!profile?.lastSync} onSync={handleSyncData} onDisconnect={handleDisconnect} />
                <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
                   <div className="xl:col-span-2">
                      <ProfileForm onSave={handleProfileSave} />

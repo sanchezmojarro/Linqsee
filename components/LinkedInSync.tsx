@@ -1,13 +1,15 @@
 
-import React, { useState, useRef } from 'react';
-import { parseLinkedInData } from '../services/geminiService';
+import React, { useEffect, useState, useRef } from 'react';
+import { AI_ENABLED, parseLinkedInData } from '../services/geminiService';
 import { UserProfile } from '../types';
 
 interface LinkedInSyncProps {
+  isSynced: boolean;
   onSync: (data: Partial<UserProfile>) => void;
+  onDisconnect: () => void;
 }
 
-export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
+export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, onDisconnect }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [syncStep, setSyncStep] = useState<'initial' | 'oauth' | 'loading' | 'success'>('initial');
   const [rawText, setRawText] = useState('');
@@ -15,37 +17,76 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startOAuthFlow = () => {
-    setSyncStep('oauth');
+    window.location.href = '/api/linkedin/auth';
   };
 
-  const handleAuthorize = () => {
-    setSyncStep('loading');
-    
-    // Simulate real API data extraction
-    setTimeout(() => {
-      const simulatedLinkedInData = {
-        name: "Carlos Mendoza",
-        expertise: "Head of Growth & AI Evangelist @ TechCorp",
-        bio: "Estratega digital enfocado en la adopción de IA Generativa para procesos de venta. Con más de 10 años escalando productos SaaS en Latinoamérica y Europa. Speaker habitual sobre el futuro del trabajo.",
-        tone: "Professional",
-        language: "Spanish",
-        lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      
-      setSyncedDataPreview(simulatedLinkedInData);
-      onSync(simulatedLinkedInData);
-      setSyncStep('success');
-      
-      // Auto-close after viewing the success card
-      setTimeout(() => {
-        setIsOpen(false);
-        setSyncStep('initial');
-        setSyncedDataPreview(null);
-      }, 3000);
-    }, 2500);
-  };
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const linkedInStatus = params.get('linkedin');
+    if (!linkedInStatus) return;
+
+    if (linkedInStatus === 'success') {
+      setSyncStep('loading');
+      setIsOpen(true);
+      fetch('/api/linkedin/me', { credentials: 'include' })
+        .then((res) => {
+          if (!res.ok) throw new Error('LinkedIn profile fetch failed');
+          return res.json();
+        })
+        .then(async (data) => {
+          const baseSynced = {
+            name: data.name || '',
+            expertise: data.headline || '',
+            bio: data.bio || '',
+            tone: 'Professional',
+            language: 'Spanish',
+            linkedInUrl: data.profileUrl,
+            lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+
+          if (AI_ENABLED && (!baseSynced.expertise || !baseSynced.bio)) {
+            const rawText = JSON.stringify(data.raw ?? data, null, 2);
+            try {
+              const aiData = await parseLinkedInData(rawText);
+              baseSynced.name = baseSynced.name || aiData.name || '';
+              baseSynced.expertise = baseSynced.expertise || aiData.expertise || '';
+              baseSynced.bio = baseSynced.bio || aiData.bio || '';
+              baseSynced.tone = aiData.tone || baseSynced.tone;
+              baseSynced.language = aiData.language || baseSynced.language;
+            } catch (error) {
+              console.warn('No se pudo enriquecer el perfil con IA.', error);
+            }
+          }
+
+          setSyncedDataPreview(baseSynced);
+          onSync(baseSynced);
+          setSyncStep('success');
+          setTimeout(() => {
+            setIsOpen(false);
+            setSyncStep('initial');
+            setSyncedDataPreview(null);
+          }, 3000);
+        })
+        .catch(() => {
+          alert('No se pudo obtener el perfil de LinkedIn. Inténtalo de nuevo.');
+          setSyncStep('initial');
+        })
+        .finally(() => {
+          params.delete('linkedin');
+          window.history.replaceState({}, '', window.location.pathname);
+        });
+    } else if (linkedInStatus === 'error') {
+      alert('La conexión con LinkedIn falló. Revisa permisos y vuelve a intentarlo.');
+      params.delete('linkedin');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [onSync]);
 
   const handleManualSync = async () => {
+    if (!AI_ENABLED) {
+      alert("La IA está desactivada. Configura VITE_OPENAI_API_KEY.");
+      return;
+    }
     if (!rawText.trim()) return;
     setSyncStep('loading');
     try {
@@ -68,26 +109,56 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!AI_ENABLED) {
+        alert("La IA está desactivada. Configura VITE_OPENAI_API_KEY.");
+        return;
+      }
       setSyncStep('loading');
       setIsOpen(true);
-      setTimeout(() => {
-        const data = {
-          name: "Perfil Extraído de PDF",
-          expertise: "Consultor Senior de Estrategia Corporativa",
-          bio: "Experto en optimización de procesos y transformación digital con enfoque en rentabilidad. He trabajado con empresas del IBEX35 definiendo su roadmap tecnológico.",
-          tone: "Direct",
-          language: "Spanish",
-          lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        setSyncedDataPreview(data);
-        onSync(data);
-        setSyncStep('success');
-        setTimeout(() => {
-          setIsOpen(false);
+      const formData = new FormData();
+      formData.append('file', file);
+      fetch('/api/pdf/parse', { method: 'POST', body: formData })
+        .then(async (res) => {
+          const payload = await res.json().catch(() => null);
+          if (!res.ok) {
+            throw new Error(payload?.error || `HTTP ${res.status}`);
+          }
+          if (!payload?.text) {
+            throw new Error('No text extracted from PDF');
+          }
+          return payload;
+        })
+        .then(async (payload) => {
+          console.log('PDF parsed', payload);
+          const parsedProfile = payload.profile || {};
+          const data = await parseLinkedInData(payload.text);
+          const dataWithTimestamp = {
+            ...data,
+            name: data.name || parsedProfile.name || '',
+            email: parsedProfile.email || '',
+            phone: parsedProfile.phone || '',
+            linkedInUrl: parsedProfile.linkedinUrl || '',
+            bio: data.bio || parsedProfile.about || '',
+            expertise: data.expertise || parsedProfile.experience?.[0]?.title || '',
+            skills: parsedProfile.skills || [],
+            experience: parsedProfile.experience || [],
+            education: parsedProfile.education || [],
+            lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+          setSyncedDataPreview(dataWithTimestamp);
+          onSync(dataWithTimestamp);
+          setSyncStep('success');
+          setTimeout(() => {
+            setIsOpen(false);
+            setSyncStep('initial');
+            setSyncedDataPreview(null);
+          }, 3000);
+        })
+        .catch((error) => {
+          console.error('PDF parse failed', error);
+          alert(`No se pudo procesar el PDF. ${error.message || 'Inténtalo de nuevo.'}`);
           setSyncStep('initial');
-          setSyncedDataPreview(null);
-        }, 3000);
-      }, 2000);
+        });
     }
   };
 
@@ -113,13 +184,27 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
                 <i className="fas fa-file-pdf"></i> Subir PDF
               </button>
               <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleFileUpload} />
-              <button 
-                onClick={() => setIsOpen(true)}
-                className="bg-[#0a66c2] text-white px-8 py-3.5 rounded-2xl font-black text-sm hover:bg-[#004182] transition-all shadow-xl shadow-blue-100 flex items-center gap-2"
-              >
-                Vincular LinkedIn
-                <i className="fas fa-lock text-[10px]"></i>
-              </button>
+              {isSynced ? (
+                <button
+                  onClick={() => {
+                    fetch('/api/linkedin/logout', { method: 'POST' }).finally(() => {
+                      onDisconnect();
+                    });
+                  }}
+                  className="bg-white text-slate-700 px-8 py-3.5 rounded-2xl font-black text-sm hover:bg-slate-100 transition-all shadow-sm border border-slate-200 flex items-center gap-2"
+                >
+                  Desvincular
+                  <i className="fas fa-unlink text-[10px]"></i>
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setIsOpen(true)}
+                  className="bg-[#0a66c2] text-white px-8 py-3.5 rounded-2xl font-black text-sm hover:bg-[#004182] transition-all shadow-xl shadow-blue-100 flex items-center gap-2"
+                >
+                  Vincular LinkedIn
+                  <i className="fas fa-lock text-[10px]"></i>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -158,7 +243,7 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
                     <div className="space-y-2 pointer-events-none">
                       <i className="fas fa-cloud-upload-alt text-2xl text-slate-300"></i>
                       <p className="font-bold text-slate-700">Importar desde PDF de Perfil</p>
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">LinkedIn -> Guardar como PDF</p>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">LinkedIn → Guardar como PDF</p>
                     </div>
                   </div>
                 </div>
@@ -172,7 +257,7 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
                     onChange={(e) => setRawText(e.target.value)}
                   />
                   <button 
-                    disabled={!rawText.trim()}
+                    disabled={!rawText.trim() || !AI_ENABLED}
                     onClick={handleManualSync}
                     className="w-full mt-4 bg-slate-900 text-white py-4 rounded-2xl font-black hover:bg-blue-600 disabled:opacity-30 transition-all"
                   >
@@ -225,7 +310,7 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
 
                   <div className="flex gap-4">
                     <button onClick={() => setSyncStep('initial')} className="flex-1 py-4 font-bold text-slate-400 hover:text-slate-600 transition-colors">Cancelar</button>
-                    <button onClick={handleAuthorize} className="flex-1 bg-[#0a66c2] text-white py-4 rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-[#004182] transition-all">Permitir Acceso</button>
+                    <button onClick={startOAuthFlow} className="flex-1 bg-[#0a66c2] text-white py-4 rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-[#004182] transition-all">Permitir Acceso</button>
                   </div>
                 </div>
               </div>

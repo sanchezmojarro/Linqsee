@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { UserProfile, CommentType } from '../types';
-import { generateLinkedInComment } from '../services/geminiService';
+import { AI_ENABLED, generateLinkedInComment } from '../services/geminiService';
 
 interface CommentSimulatorProps {
   profile: UserProfile | null;
@@ -14,6 +14,10 @@ export const CommentSimulator: React.FC<CommentSimulatorProps> = ({ profile }) =
   const [activeType, setActiveType] = useState<CommentType | null>(null);
 
   const handleGenerate = async (type: CommentType) => {
+    if (!AI_ENABLED) {
+      alert('La IA está desactivada. Configura VITE_OPENAI_API_KEY.');
+      return;
+    }
     if (!profile) {
       alert('Por favor, configura tu perfil primero.');
       return;
@@ -70,7 +74,7 @@ export const CommentSimulator: React.FC<CommentSimulatorProps> = ({ profile }) =
                 <button
                   key={btn.type}
                   onClick={() => handleGenerate(btn.type)}
-                  disabled={loading}
+                  disabled={loading || !AI_ENABLED}
                   className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all group ${
                     activeType === btn.type && loading 
                     ? 'border-blue-600 bg-blue-50' 

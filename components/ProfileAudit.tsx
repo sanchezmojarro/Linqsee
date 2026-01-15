@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { auditProfile, EnhancedAuditResult } from '../services/geminiService';
+import { AI_ENABLED, auditProfile, EnhancedAuditResult } from '../services/geminiService';
 
 interface ProfileAuditProps {
   profile: UserProfile | null;
@@ -14,10 +14,24 @@ export const ProfileAudit: React.FC<ProfileAuditProps> = ({ profile, onApplyImpr
 
   const runAudit = async () => {
     if (!profile) return;
+    if (!AI_ENABLED) {
+      alert("La IA está desactivada. Configura VITE_OPENAI_API_KEY.");
+      return;
+    }
     setLoading(true);
     try {
       const data = await auditProfile(profile);
-      setResult(data);
+      const filtered = {
+        ...data,
+        weaknesses: data.weaknesses?.filter((weakness) => {
+          const text = weakness.toLowerCase();
+          if (profile.experience?.length && text.includes("experiencia")) return false;
+          if (profile.education?.length && text.includes("educ")) return false;
+          if (profile.bio && (text.includes("bio") || text.includes("about") || text.includes("acerca"))) return false;
+          return true;
+        }),
+      };
+      setResult(filtered);
     } catch (e) {
       console.error("Audit failed:", e);
       alert("Error auditando el perfil. Inténtalo de nuevo.");
@@ -47,8 +61,16 @@ export const ProfileAudit: React.FC<ProfileAuditProps> = ({ profile, onApplyImpr
     </div>
   );
 
+  const missingProfileData = !profile.expertise || !profile.bio;
+
   return (
     <div className="space-y-8">
+      {missingProfileData && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-4 text-amber-900 text-sm font-semibold">
+          ⚠️ Faltan datos de tu perfil (headline o biografía). LinkedIn no los expone vía OIDC.
+          Para una auditoría completa, sube el PDF de tu perfil desde LinkedIn.
+        </div>
+      )}
       {/* Audit Control Card */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-50 overflow-hidden relative">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
@@ -58,7 +80,7 @@ export const ProfileAudit: React.FC<ProfileAuditProps> = ({ profile, onApplyImpr
           </div>
           <button 
             onClick={runAudit}
-            disabled={loading}
+            disabled={loading || !AI_ENABLED}
             className="w-full md:w-auto bg-slate-900 text-white px-10 py-4 rounded-2xl font-black text-sm hover:bg-blue-600 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 shadow-xl shadow-slate-200"
           >
             {loading ? (
