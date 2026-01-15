@@ -82,7 +82,12 @@ const App: React.FC = () => {
       tone: partial.tone || profile?.tone || 'Professional',
       language: partial.language || profile?.language || 'Spanish',
       linkedInUrl: partial.linkedInUrl || profile?.linkedInUrl,
-      lastSync: partial.lastSync || profile?.lastSync
+      lastSync: partial.lastSync || profile?.lastSync,
+      email: partial.email || profile?.email,
+      phone: partial.phone || profile?.phone,
+      skills: partial.skills || profile?.skills,
+      experience: partial.experience || profile?.experience,
+      education: partial.education || profile?.education
     };
     handleProfileSave(updated);
   };

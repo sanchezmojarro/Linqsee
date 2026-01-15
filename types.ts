@@ -13,6 +13,21 @@ export interface UserProfile {
   language: string;
   linkedInUrl?: string;
   lastSync?: string;
+  email?: string;
+  phone?: string;
+  skills?: string[];
+  experience?: {
+    company: string;
+    title: string;
+    dates: string;
+    description: string;
+  }[];
+  education?: {
+    school: string;
+    degree: string;
+    dates: string;
+    description: string;
+  }[];
 }
 
 // Added missing CommentGenerationRequest interface to fix the import error in the AI service.

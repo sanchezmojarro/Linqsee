@@ -129,9 +129,20 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
           return payload;
         })
         .then(async (payload) => {
+          console.log('PDF parsed', payload);
+          const parsedProfile = payload.profile || {};
           const data = await parseLinkedInData(payload.text);
           const dataWithTimestamp = {
             ...data,
+            name: data.name || parsedProfile.name || '',
+            email: parsedProfile.email || '',
+            phone: parsedProfile.phone || '',
+            linkedInUrl: parsedProfile.linkedinUrl || '',
+            bio: data.bio || parsedProfile.about || '',
+            expertise: data.expertise || parsedProfile.experience?.[0]?.title || '',
+            skills: parsedProfile.skills || [],
+            experience: parsedProfile.experience || [],
+            education: parsedProfile.education || [],
             lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           };
           setSyncedDataPreview(dataWithTimestamp);

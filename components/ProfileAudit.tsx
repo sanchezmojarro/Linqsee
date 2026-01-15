@@ -21,7 +21,17 @@ export const ProfileAudit: React.FC<ProfileAuditProps> = ({ profile, onApplyImpr
     setLoading(true);
     try {
       const data = await auditProfile(profile);
-      setResult(data);
+      const filtered = {
+        ...data,
+        weaknesses: data.weaknesses?.filter((weakness) => {
+          const text = weakness.toLowerCase();
+          if (profile.experience?.length && text.includes("experiencia")) return false;
+          if (profile.education?.length && text.includes("educ")) return false;
+          if (profile.bio && (text.includes("bio") || text.includes("about") || text.includes("acerca"))) return false;
+          return true;
+        }),
+      };
+      setResult(filtered);
     } catch (e) {
       console.error("Audit failed:", e);
       alert("Error auditando el perfil. Inténtalo de nuevo.");
