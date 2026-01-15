@@ -35,10 +35,8 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
       throw new Error("PDF.js no está disponible.");
     }
 
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.js";
-    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.js";
 
     const arrayBuffer = await file.arrayBuffer();
     let pdf;
@@ -48,8 +46,8 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ isSynced, onSync, on
       console.warn("PDF.js worker failed, retrying without worker.", error);
       pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true }).promise;
     }
-    let text = "";
 
+    let text = "";
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
       const page = await pdf.getPage(pageNum);
       const content = await page.getTextContent();
