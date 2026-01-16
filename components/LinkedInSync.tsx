@@ -67,8 +67,8 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
 
   const extractPdfText = async (file: File) => {
     const [{ getDocument, GlobalWorkerOptions }, workerUrlModule] = await Promise.all([
-      import('pdfjs-dist/build/pdf.min.mjs'),
-      import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+      import('pdfjs-dist/legacy/build/pdf.min.mjs'),
+      import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')
     ]);
     GlobalWorkerOptions.workerSrc = workerUrlModule.default;
     const arrayBuffer = await file.arrayBuffer();
