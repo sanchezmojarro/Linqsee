@@ -1,13 +1,7 @@
 
 import React, { useState, useRef } from 'react';
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import { parseLinkedInData } from '../services/geminiService';
 import { UserProfile } from '../types';
-
-GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString();
 
 interface LinkedInSyncProps {
   onSync: (data: Partial<UserProfile>) => void;
@@ -72,6 +66,11 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
   };
 
   const extractPdfText = async (file: File) => {
+    const [{ getDocument, GlobalWorkerOptions }, workerUrlModule] = await Promise.all([
+      import('pdfjs-dist/build/pdf.min.mjs'),
+      import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+    ]);
+    GlobalWorkerOptions.workerSrc = workerUrlModule.default;
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await getDocument({ data: arrayBuffer }).promise;
     const pages = Array.from({ length: pdf.numPages }, (_, index) => index + 1);
