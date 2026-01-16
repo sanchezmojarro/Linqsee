@@ -15,17 +15,25 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ onSave }) => {
     tone: 'Professional',
     language: 'Spanish'
   });
+  const loadStoredProfile = () => {
+    const saved = localStorage.getItem('user_persona');
+    if (!saved) return;
+    try {
+      setProfile(JSON.parse(saved));
+    } catch (error) {
+      console.error('Error parsing saved profile:', error);
+      localStorage.removeItem('user_persona');
+    }
+  };
 
   useEffect(() => {
-    const saved = localStorage.getItem('user_persona');
-    if (saved) setProfile(JSON.parse(saved));
+    loadStoredProfile();
   }, []);
 
   // Listen for storage changes to update form if sync happens in another component logic
   useEffect(() => {
     const handleStorage = () => {
-      const saved = localStorage.getItem('user_persona');
-      if (saved) setProfile(JSON.parse(saved));
+      loadStoredProfile();
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);

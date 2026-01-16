@@ -65,29 +65,61 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const extractPdfText = async (file: File) => {
+    const pdfjs = await import(
+      /* @vite-ignore */
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs'
+    );
+    const { getDocument, GlobalWorkerOptions } = pdfjs;
+    GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await getDocument({ data: arrayBuffer }).promise;
+    const pages = Array.from({ length: pdf.numPages }, (_, index) => index + 1);
+    const pageText = await Promise.all(
+      pages.map(async (pageNumber) => {
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        return content.items
+          .map((item) => ('str' in item ? item.str : ''))
+          .join(' ');
+      })
+    );
+    return pageText.join('\n');
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setSyncStep('loading');
       setIsOpen(true);
-      setTimeout(() => {
-        const data = {
-          name: "Perfil Extraído de PDF",
-          expertise: "Consultor Senior de Estrategia Corporativa",
-          bio: "Experto en optimización de procesos y transformación digital con enfoque en rentabilidad. He trabajado con empresas del IBEX35 definiendo su roadmap tecnológico.",
-          tone: "Direct",
-          language: "Spanish",
+      try {
+        const pdfText = await extractPdfText(file);
+        setRawText(pdfText);
+        if (!pdfText.trim()) {
+          alert('No se pudo extraer texto del PDF.');
+          setSyncStep('initial');
+          return;
+        }
+        const data = await parseLinkedInData(pdfText);
+        const dataWithTimestamp = {
+          ...data,
           lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
-        setSyncedDataPreview(data);
-        onSync(data);
+        setSyncedDataPreview(dataWithTimestamp);
+        onSync(dataWithTimestamp);
         setSyncStep('success');
         setTimeout(() => {
           setIsOpen(false);
           setSyncStep('initial');
           setSyncedDataPreview(null);
         }, 3000);
-      }, 2000);
+      } catch (error) {
+        console.error('Error leyendo el PDF:', error);
+        alert('Error leyendo el PDF.');
+        setSyncStep('initial');
+      } finally {
+        e.target.value = '';
+      }
     }
   };
 
