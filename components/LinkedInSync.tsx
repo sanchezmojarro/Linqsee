@@ -66,11 +66,12 @@ export const LinkedInSync: React.FC<LinkedInSyncProps> = ({ onSync }) => {
   };
 
   const extractPdfText = async (file: File) => {
-    const [{ getDocument, GlobalWorkerOptions }, workerUrlModule] = await Promise.all([
-      import('pdfjs-dist/legacy/build/pdf.min.mjs'),
-      import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')
-    ]);
-    GlobalWorkerOptions.workerSrc = workerUrlModule.default;
+    const pdfjs = await import(
+      /* @vite-ignore */
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs'
+    );
+    const { getDocument, GlobalWorkerOptions } = pdfjs;
+    GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await getDocument({ data: arrayBuffer }).promise;
     const pages = Array.from({ length: pdf.numPages }, (_, index) => index + 1);
